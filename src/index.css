@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #FBF6EE;
+  --color-ink: #1F2A44;
+  --color-ink-soft: #3D4A66;
+  --color-coral: #E06C5C;
+  --color-coral-dark: #C45344;
+  --color-teal: #2A9D8F;
+  --color-teal-dark: #1F7A70;
+  --color-sunflower: #E9C46A;
+  --color-sage: #B7CDB0;
+  --color-paper: #FFFdf8;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-ui: "Nunito", system-ui, sans-serif;
+  --font-hand: "Patrick Hand", "Segoe Print", cursive;
+  --shadow-paper: 0 18px 40px -18px rgb(31 42 68 / 0.35), 0 2px 0 rgb(31 42 68 / 0.04);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  color: var(--color-ink);
+  background-color: var(--color-cream);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgb(31 42 68 / 0.06) 1px, transparent 0);
+  background-size: 22px 22px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+}
+
+::selection {
+  background: rgb(233 196 106 / 0.55);
+  color: var(--color-ink);
+}
+
+button, a, input, select, textarea {
+  font-family: inherit;
+}
+
+.paper-shadow {
+  box-shadow: var(--shadow-paper);
+}
+
+.lined-rule {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 26px,
+    #8ecae6 26px,
+    #8ecae6 27px
+  );
+}
+
+.trace-glyph {
+  font-family: var(--font-hand);
+  color: transparent;
+  -webkit-text-stroke: 1.4px rgb(31 42 68 / 0.45);
+  letter-spacing: 0.08em;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html, body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible;
+  }
+
+  .print-sheet {
+    position: absolute;
+    inset: 0;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    break-after: avoid;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
