@@ -19,7 +19,7 @@ const COPY: Record<PaywallReason, { kicker: string; title: string; body: string 
   preview: {
     kicker: 'Worksheet Wizard Lifetime',
     title: 'Keep making sheets, skip the limits',
-    body: 'Unlimited PDFs, every theme, name on the page, school header, no watermark. One payment, kept in this browser.',
+    body: 'Unlimited PDFs, every theme, name on the page, school header, no watermark. Demo unlock — no charge. Sign in so it follows your account.',
   },
   customise: {
     kicker: 'Full customisation',
@@ -29,7 +29,7 @@ const COPY: Record<PaywallReason, { kicker: string; title: string; body: string 
   studio: {
     kicker: 'Teacher Pack',
     title: 'Save your library and print a class set',
-    body: 'Teacher Studio can already preview your questions. The ₹149 pack keeps templates in this browser and downloads one named PDF copy per student.',
+    body: 'Teacher Studio can already preview your questions. The ₹149 pack (demo) keeps templates with you and downloads one named PDF copy per student.',
   },
 }
 
@@ -37,11 +37,12 @@ interface Props {
   reason: PaywallReason
   unlocked: boolean
   teacherPack: boolean
+  signedIn?: boolean
   onClose: () => void
   onUnlock: (tier: UnlockTier) => void
 }
 
-export function Paywall({ reason, unlocked, teacherPack, onClose, onUnlock }: Props) {
+export function Paywall({ reason, unlocked, teacherPack, signedIn, onClose, onUnlock }: Props) {
   const copy = COPY[reason]
   const showTeacherFirst = reason === 'studio'
   return (
@@ -111,12 +112,13 @@ export function Paywall({ reason, unlocked, teacherPack, onClose, onUnlock }: Pr
             </div>
           ) : (
             <p className="mt-4 rounded-xl bg-teal/10 px-3 py-2 text-center text-sm font-bold text-teal-dark">
-              Teacher Pack is already on this device.
+              {signedIn ? 'Teacher Pack is on your account.' : 'Teacher Pack is already on this device.'}
             </p>
           )}
 
           <p className="mt-3 text-center text-[11px] text-ink/45">
-            UPI · Cards · Netbanking · Wallet · Prototype checkout (no charge)
+            Demo checkout — no UPI, card or wallet is charged.
+            {signedIn ? ' This unlock is saved to your account.' : ' Sign in if you want it to follow you across devices.'}
           </p>
           <button type="button" onClick={onClose} className="mt-3 w-full py-2 text-sm font-semibold text-ink/55 hover:text-ink">
             Not now

@@ -4,27 +4,26 @@ import { isTeacherPack, isUnlocked, loadForm, unlockLifetime, unlockTeacherPack 
 import { generateWorksheet } from './lib/generators'
 import { downloadWorksheet } from './lib/export'
 import { wizardInput } from './lib/sheet'
+import { useAuth } from './lib/auth'
 import { Landing } from './components/Landing'
 import { Wizard } from './components/Wizard'
 import { TeacherStudio } from './components/TeacherStudio'
 import { Paywall } from './components/Paywall'
+import { AuthModal } from './components/AuthModal'
 
 export default function App() {
+  const { user, profile, dataEpoch } = useAuth()
   const [view, setView] = useState<'landing' | 'wizard' | 'studio'>('landing')
-  const [unlocked, setUnlocked] = useState(() => isUnlocked())
-  const [teacherPack, setTeacherPack] = useState(() => isTeacherPack())
+  const [unlockTick, setUnlockTick] = useState(0)
   const [paywall, setPaywall] = useState<PaywallReason | null>(null)
   const saved = loadForm()
+  const unlocked = unlockTick >= 0 && ((profile?.unlocked ?? false) || isUnlocked())
+  const teacherPack = unlockTick >= 0 && ((profile?.teacherPack ?? false) || isTeacherPack())
 
   const unlock = (tier: UnlockTier) => {
-    if (tier === 'teacher') {
-      unlockTeacherPack()
-      setTeacherPack(true)
-      setUnlocked(true)
-    } else {
-      unlockLifetime()
-      setUnlocked(true)
-    }
+    if (tier === 'teacher') unlockTeacherPack()
+    else unlockLifetime()
+    setUnlockTick((n) => n + 1)
     setPaywall(null)
   }
 
@@ -55,6 +54,7 @@ export default function App() {
         <Landing
           unlocked={unlocked}
           teacherPack={teacherPack}
+          signedIn={Boolean(user)}
           onCreate={() => setView('wizard')}
           onStudio={() => setView('studio')}
           onSample={() => void samplePdf()}
@@ -62,6 +62,7 @@ export default function App() {
         />
       ) : view === 'studio' ? (
         <TeacherStudio
+          key={dataEpoch}
           unlocked={unlocked}
           teacherPack={teacherPack}
           onHome={() => setView('landing')}
@@ -82,10 +83,12 @@ export default function App() {
           reason={paywall}
           unlocked={unlocked}
           teacherPack={teacherPack}
+          signedIn={Boolean(user)}
           onClose={() => setPaywall(null)}
           onUnlock={unlock}
         />
       ) : null}
+      <AuthModal />
     </>
   )
 }

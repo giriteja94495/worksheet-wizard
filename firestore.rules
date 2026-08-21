@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function str(field, max) {
+      return request.resource.data[field] is string
+        && request.resource.data[field].size() <= max;
+    }
+
+    function validTimestamp() {
+      return request.resource.data.updatedAt is timestamp;
+    }
+
+    function validUser() {
+      return request.resource.data.keys().hasOnly(['email', 'displayName', 'unlocked', 'teacherPack', 'updatedAt'])
+        && str('email', 320)
+        && str('displayName', 120)
+        && request.resource.data.unlocked is bool
+        && request.resource.data.teacherPack is bool
+        && (!request.resource.data.teacherPack || request.resource.data.unlocked == true)
+        && validTimestamp();
+    }
+
+    function validTemplate() {
+      return request.resource.data.keys().hasOnly([
+          'name', 'classNum', 'subject', 'questions', 'wordList', 'pairs', 'updatedAt',
+          'topic', 'title', 'schoolName', 'section', 'marks', 'timeAllowed',
+          'instructions', 'includeAnswerKey', 'questionCount', 'theme'
+        ])
+        && str('name', 200)
+        && request.resource.data.classNum is int
+        && request.resource.data.classNum >= 1
+        && request.resource.data.classNum <= 10
+        && str('subject', 120)
+        && str('questions', 100000)
+        && str('wordList', 20000)
+        && str('pairs', 20000)
+        && str('topic', 80)
+        && str('title', 200)
+        && str('schoolName', 200)
+        && str('section', 40)
+        && str('marks', 40)
+        && str('timeAllowed', 40)
+        && str('instructions', 4000)
+        && request.resource.data.includeAnswerKey is bool
+        && request.resource.data.questionCount is int
+        && request.resource.data.questionCount >= 0
+        && request.resource.data.questionCount <= 500
+        && request.resource.data.theme in ['sunshine', 'ocean', 'jungle', 'space']
+        && validTimestamp();
+    }
+
+    function validClassList() {
+      return request.resource.data.keys().hasOnly(['name', 'names', 'updatedAt'])
+        && str('name', 200)
+        && request.resource.data.names is list
+        && request.resource.data.names.size() <= 30
+        && validTimestamp();
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validUser();
+      allow update: if isOwner(uid) && validUser();
+      allow delete: if isOwner(uid);
+
+      match /templates/{id} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validTemplate();
+        allow update: if isOwner(uid) && validTemplate();
+        allow delete: if isOwner(uid);
+      }
+
+      match /classLists/{id} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validClassList();
+        allow update: if isOwner(uid) && validClassList();
+        allow delete: if isOwner(uid);
+      }
+    }
+  }
+}

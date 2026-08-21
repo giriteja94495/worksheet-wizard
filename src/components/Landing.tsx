@@ -2,6 +2,7 @@ import { generateWorksheet, renderPreview } from '../lib/generators'
 import { WorksheetPaper } from './WorksheetPaper'
 import { Pricing } from './Pricing'
 import { Logo } from './Logo'
+import { AccountMenu } from './AccountMenu'
 import { TYPE_META, TYPE_ORDER } from '../lib/catalog'
 import { wizardInput } from '../lib/sheet'
 import type { UnlockTier, WorksheetType } from '../types'
@@ -9,6 +10,7 @@ import type { UnlockTier, WorksheetType } from '../types'
 interface Props {
   unlocked: boolean
   teacherPack: boolean
+  signedIn?: boolean
   onCreate: () => void
   onStudio: () => void
   onSample: () => void
@@ -57,11 +59,11 @@ const SAMPLES: {
   },
 ]
 
-export function Landing({ unlocked, teacherPack, onCreate, onStudio, onSample, onUnlock }: Props) {
+export function Landing({ unlocked, teacherPack, signedIn, onCreate, onStudio, onSample, onUnlock }: Props) {
   return (
     <div>
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-cream/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Logo compact />
           <nav className="hidden items-center gap-6 text-sm font-bold sm:flex">
             <a href="#features" className="hover:text-coral">
@@ -73,13 +75,17 @@ export function Landing({ unlocked, teacherPack, onCreate, onStudio, onSample, o
             <button type="button" onClick={onStudio} className="hover:text-coral">
               Teacher Studio
             </button>
+            <AccountMenu />
             <button type="button" onClick={onCreate} className="rounded-full bg-ink px-4 py-2 text-cream">
               Create
             </button>
           </nav>
-          <button type="button" onClick={onCreate} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-cream sm:hidden">
-            Create
-          </button>
+          <div className="flex items-center gap-2 sm:hidden">
+            <AccountMenu />
+            <button type="button" onClick={onCreate} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-cream">
+              Create
+            </button>
+          </div>
         </div>
       </header>
 
@@ -114,7 +120,7 @@ export function Landing({ unlocked, teacherPack, onCreate, onStudio, onSample, o
               Sample PDF
             </button>
           </div>
-          <p className="mt-4 text-sm text-ink/50">No signup. Runs in the browser. Prints on A4.</p>
+          <p className="mt-4 text-sm text-ink/50">No signup needed. Sign in only if you want your teacher library in the cloud.</p>
         </div>
         <div className="relative mx-auto h-[22rem] w-full max-w-md sm:h-[26rem]">
           {SAMPLES.map((s, i) => {
@@ -186,10 +192,10 @@ export function Landing({ unlocked, teacherPack, onCreate, onStudio, onSample, o
         </div>
       </section>
 
-      <Pricing unlocked={unlocked} teacherPack={teacherPack} onUnlock={onUnlock} />
+      <Pricing unlocked={unlocked} teacherPack={teacherPack} signedIn={signedIn} onUnlock={onUnlock} />
 
       <footer className="border-t border-ink/10 px-4 py-10 text-center text-sm text-ink/55">
-        <p>Made for Indian parents & teachers · Class 1–10 · Works fully in your browser · No signup</p>
+        <p>Made for Indian parents & teachers · Class 1–10 · Works in your browser · Sign-in optional</p>
         <p className="mt-2 font-display text-ink">Worksheet Wizard · worksheetwizard.app</p>
       </footer>
     </div>

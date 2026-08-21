@@ -16,6 +16,7 @@ import { TypePicker } from './TypePicker'
 import { DetailsForm } from './DetailsForm'
 import { Preview } from './Preview'
 import { Logo } from './Logo'
+import { AccountMenu } from './AccountMenu'
 
 interface Props {
   unlocked: boolean
@@ -176,17 +177,18 @@ export function Wizard({ unlocked, teacherPack, onRequestPaywall, onHome, onStud
   return (
     <div className="min-h-screen">
       <header className="no-print sticky top-0 z-20 border-b border-ink/10 bg-cream/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <button type="button" onClick={onHome} className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-coral">
             <Logo compact />
           </button>
-          <ol className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-ink/40">
+          <ol className="hidden items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-ink/40 sm:flex">
             {[1, 2, 3].map((n) => (
               <li key={n} className={step === n ? 'text-coral' : ''}>
                 {n === 1 ? 'Type' : n === 2 ? 'Details' : 'Print'}
               </li>
             ))}
           </ol>
+          <AccountMenu />
         </div>
         <div className="h-1 bg-ink/5">
           <div className="h-full bg-coral transition-all" style={{ width: `${(step / 3) * 100}%` }} />

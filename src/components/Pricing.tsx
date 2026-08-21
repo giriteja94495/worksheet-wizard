@@ -3,10 +3,11 @@ import type { UnlockTier } from '../types'
 interface Props {
   unlocked: boolean
   teacherPack: boolean
+  signedIn?: boolean
   onUnlock: (tier: UnlockTier) => void
 }
 
-export function Pricing({ unlocked, teacherPack, onUnlock }: Props) {
+export function Pricing({ unlocked, teacherPack, signedIn, onUnlock }: Props) {
   return (
     <section id="pricing" className="scroll-mt-24 px-4 py-16">
       <div className="mx-auto max-w-5xl">
@@ -14,6 +15,7 @@ export function Pricing({ unlocked, teacherPack, onUnlock }: Props) {
         <h2 className="mt-2 text-center font-display text-3xl sm:text-4xl">One tea, a lifetime of sheets</h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-ink-soft">
           Built for a Sunday afternoon at the dining table — and for the teacher who needs thirty named copies by first period.
+          Unlock buttons are a demo: nothing is charged.
         </p>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           <article className="rounded-3xl border border-ink/10 bg-white p-6">
@@ -42,7 +44,7 @@ export function Pricing({ unlocked, teacherPack, onUnlock }: Props) {
             </ul>
             {unlocked ? (
               <p className="mt-5 rounded-xl bg-teal/10 px-3 py-2 text-center text-sm font-bold text-teal-dark">
-                Unlocked on this device
+                {signedIn ? 'Unlocked on your account' : 'Unlocked on this device'}
               </p>
             ) : (
               <button
@@ -70,7 +72,7 @@ export function Pricing({ unlocked, teacherPack, onUnlock }: Props) {
             </ul>
             {teacherPack ? (
               <p className="mt-5 rounded-xl bg-teal/10 px-3 py-2 text-center text-sm font-bold text-teal-dark">
-                Teacher Pack unlocked
+                {signedIn ? 'Teacher Pack on your account' : 'Teacher Pack unlocked'}
               </p>
             ) : (
               <button
@@ -83,6 +85,9 @@ export function Pricing({ unlocked, teacherPack, onUnlock }: Props) {
             )}
           </article>
         </div>
+        <p className="mt-6 text-center text-[12px] text-ink/45">
+          ₹49 and ₹149 are demo prices. Nothing is billed. {signedIn ? 'Signed-in unlocks sync with your account.' : 'Sign in so a demo unlock can follow you.'}
+        </p>
       </div>
     </section>
   )

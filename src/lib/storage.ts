@@ -1,10 +1,22 @@
-import type { Difficulty, SchoolClass, TeacherTemplate, ThemeId, UnlockTier, WorksheetType } from '../types'
+import type { Difficulty, SavedClassList, SchoolClass, TeacherTemplate, ThemeId, UnlockTier, WorksheetType } from '../types'
 import { SAMPLE_TEMPLATES } from './templates'
+import {
+  deleteCloudClassList,
+  deleteCloudTemplate,
+  saveUnlockToCloud,
+  upsertCloudClassList,
+  upsertCloudTemplate,
+} from './cloud'
 
 const UNLOCK_KEY = 'ww.unlocked'
 const COUNT_KEY = 'ww.dailyDownloads'
 const FORM_KEY = 'ww.lastForm'
 const TEMPLATES_KEY = 'ww.templates'
+const CLASS_LISTS_KEY = 'ww.classLists'
+const CLASS_LIST_DRAFT_KEY = 'ww.classListDraft'
+const CLOUD_BOUND_KEY = 'ww.cloudBoundUid'
+
+export const DEFAULT_CLASS_LIST = 'Aarav\nAnaya\nKabir\nIsha\nRohan'
 
 export interface SavedForm {
   childName: string
@@ -32,6 +44,37 @@ interface DailyCount {
   count: number
 }
 
+let activeCloudUid: string | null = null
+
+export function setActiveCloudUid(uid: string | null): void {
+  activeCloudUid = uid
+}
+
+export function getCloudBoundUid(): string | null {
+  try {
+    return localStorage.getItem(CLOUD_BOUND_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setCloudBoundUid(uid: string | null): void {
+  try {
+    if (uid) localStorage.setItem(CLOUD_BOUND_KEY, uid)
+    else localStorage.removeItem(CLOUD_BOUND_KEY)
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function cloudWrite(task: (uid: string) => Promise<void>): void {
+  const uid = activeCloudUid
+  if (!uid) return
+  void task(uid).catch((err) => {
+    console.warn('Worksheet Wizard cloud sync failed', err)
+  })
+}
+
 function todayStamp(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -57,13 +100,23 @@ export function isTeacherPack(): boolean {
   return getUnlockTier() === 'teacher'
 }
 
+function persistUnlock(tier: UnlockTier): void {
+  localStorage.setItem(UNLOCK_KEY, tier)
+  cloudWrite((uid) => saveUnlockToCloud(uid, tier === 'teacher'))
+}
+
 export function unlockLifetime(): void {
   if (isTeacherPack()) return
-  localStorage.setItem(UNLOCK_KEY, 'lifetime')
+  persistUnlock('lifetime')
 }
 
 export function unlockTeacherPack(): void {
-  localStorage.setItem(UNLOCK_KEY, 'teacher')
+  persistUnlock('teacher')
+}
+
+export function applyUnlockTier(tier: UnlockTier): void {
+  if (tier === 'free') return
+  localStorage.setItem(UNLOCK_KEY, tier)
 }
 
 export function getDailyDownloads(): number {
@@ -104,7 +157,7 @@ export function loadForm(): Partial<SavedForm> {
   }
 }
 
-function readUserTemplates(): TeacherTemplate[] {
+export function readUserTemplates(): TeacherTemplate[] {
   try {
     const raw = localStorage.getItem(TEMPLATES_KEY)
     if (!raw) return []
@@ -116,7 +169,7 @@ function readUserTemplates(): TeacherTemplate[] {
   }
 }
 
-function writeUserTemplates(list: TeacherTemplate[]): void {
+export function writeUserTemplates(list: TeacherTemplate[]): void {
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list))
 }
 
@@ -139,20 +192,78 @@ export function saveTemplate(template: TeacherTemplate): TeacherTemplate {
   }
   const others = readUserTemplates().filter((t) => t.id !== next.id)
   writeUserTemplates([next, ...others])
+  cloudWrite((uid) => upsertCloudTemplate(uid, next))
   return next
 }
 
 export function renameTemplate(id: string, name: string): void {
   const trimmed = name.trim()
   if (!trimmed) return
-  writeUserTemplates(readUserTemplates().map((t) => (t.id === id ? { ...t, name: trimmed, updatedAt: Date.now() } : t)))
+  const next = readUserTemplates().map((t) => (t.id === id ? { ...t, name: trimmed, updatedAt: Date.now() } : t))
+  writeUserTemplates(next)
+  const saved = next.find((t) => t.id === id)
+  if (saved) cloudWrite((uid) => upsertCloudTemplate(uid, saved))
 }
 
 export function deleteTemplate(id: string): void {
   if (id.startsWith('sample-')) return
   writeUserTemplates(readUserTemplates().filter((t) => t.id !== id))
+  cloudWrite((uid) => deleteCloudTemplate(uid, id))
 }
 
 export function newTemplateId(): string {
   return `t-${Date.now()}`
+}
+
+export function readClassLists(): SavedClassList[] {
+  try {
+    const raw = localStorage.getItem(CLASS_LISTS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as SavedClassList[]
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((l) => l && typeof l.id === 'string' && Array.isArray(l.names))
+  } catch {
+    return []
+  }
+}
+
+export function writeClassLists(list: SavedClassList[]): void {
+  localStorage.setItem(CLASS_LISTS_KEY, JSON.stringify(list))
+}
+
+export function listClassLists(): SavedClassList[] {
+  return readClassLists().sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+export function saveClassList(list: SavedClassList): SavedClassList {
+  const now = Date.now()
+  const next: SavedClassList = {
+    id: list.id || `cl-${now}`,
+    name: list.name.trim() || 'My class',
+    names: list.names.slice(0, 30),
+    updatedAt: now,
+  }
+  const others = readClassLists().filter((l) => l.id !== next.id)
+  writeClassLists([next, ...others])
+  cloudWrite((uid) => upsertCloudClassList(uid, next))
+  return next
+}
+
+export function deleteClassList(id: string): void {
+  writeClassLists(readClassLists().filter((l) => l.id !== id))
+  cloudWrite((uid) => deleteCloudClassList(uid, id))
+}
+
+export function loadClassListDraft(): string {
+  try {
+    const raw = localStorage.getItem(CLASS_LIST_DRAFT_KEY)
+    if (typeof raw === 'string' && raw.length) return raw
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_CLASS_LIST
+}
+
+export function saveClassListDraft(text: string): void {
+  localStorage.setItem(CLASS_LIST_DRAFT_KEY, text)
 }

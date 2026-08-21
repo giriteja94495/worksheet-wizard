@@ -4,19 +4,26 @@ import { generateWorksheet } from '../lib/generators'
 import { downloadClassSet, downloadWorksheet } from '../lib/export'
 import {
   FREE_DAILY_LIMIT,
+  deleteClassList,
   deleteTemplate,
   getDailyDownloads,
   getTemplate,
   incrementDailyDownloads,
+  listClassLists,
   listTemplates,
+  loadClassListDraft,
   remainingFreeDownloads,
   renameTemplate,
+  saveClassList,
+  saveClassListDraft,
   saveTemplate,
 } from '../lib/storage'
 import { ageFromClass, parseNameList, wizardInput } from '../lib/sheet'
+import { useAuth } from '../lib/auth'
 import { ClassPicker } from './ClassPicker'
 import { Preview } from './Preview'
 import { Logo } from './Logo'
+import { AccountMenu } from './AccountMenu'
 
 interface Props {
   unlocked: boolean
@@ -50,9 +57,12 @@ function blankTemplate(classLevel: SchoolClass): TeacherTemplate {
 }
 
 export function TeacherStudio({ unlocked, teacherPack, onHome, onRequestPaywall }: Props) {
+  const { user } = useAuth()
   const [library, setLibrary] = useState(() => listTemplates())
   const [draft, setDraft] = useState<TeacherTemplate>(() => ({ ...library[0]! }))
-  const [classList, setClassList] = useState('Aarav\nAnaya\nKabir\nIsha\nRohan')
+  const [classList, setClassList] = useState(() => loadClassListDraft())
+  const [savedLists, setSavedLists] = useState(() => listClassLists())
+  const [listName, setListName] = useState('My class')
   const [step, setStep] = useState<'edit' | 'preview'>('edit')
   const [seed, setSeed] = useState(() => Date.now())
   const [busy, setBusy] = useState(false)
@@ -84,7 +94,7 @@ export function TeacherStudio({ unlocked, teacherPack, onHome, onRequestPaywall 
     })
     setDraft(saved)
     refresh(saved.id)
-    setNotice('Saved to this browser’s teacher library.')
+    setNotice(user ? 'Saved to your account — it’ll be here on other devices.' : 'Saved to this browser’s teacher library. Sign in to keep it in the cloud.')
   }
 
   const load = (id: string) => {
@@ -186,11 +196,12 @@ export function TeacherStudio({ unlocked, teacherPack, onHome, onRequestPaywall 
   return (
     <div className="min-h-screen">
       <header className="no-print sticky top-0 z-20 border-b border-ink/10 bg-cream/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <button type="button" onClick={onHome} className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-coral">
             <Logo compact />
           </button>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-coral">Teacher Studio</p>
+          <p className="hidden text-[11px] font-bold uppercase tracking-wider text-coral sm:block">Teacher Studio</p>
+          <AccountMenu />
         </div>
       </header>
 
@@ -383,7 +394,10 @@ export function TeacherStudio({ unlocked, teacherPack, onHome, onRequestPaywall 
                 </span>
                 <textarea
                   value={classList}
-                  onChange={(e) => setClassList(e.target.value)}
+                  onChange={(e) => {
+                    setClassList(e.target.value)
+                    saveClassListDraft(e.target.value)
+                  }}
                   rows={5}
                   placeholder="Aarav, Anaya, Kabir — or one name per line"
                   className="w-full rounded-xl border border-ink/15 bg-white px-3 py-2.5 outline-none ring-coral/40 focus:ring-2"
@@ -391,6 +405,75 @@ export function TeacherStudio({ unlocked, teacherPack, onHome, onRequestPaywall 
                 <span className="mt-1 block text-[12px] text-ink/45">
                   {names.length} student{names.length === 1 ? '' : 's'} · Download makes one named A4 copy each.
                 </span>
+                {savedLists.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {savedLists.map((list) => (
+                      <button
+                        key={list.id}
+                        type="button"
+                        onClick={() => {
+                          const text = list.names.join('\n')
+                          setClassList(text)
+                          saveClassListDraft(text)
+                          setListName(list.name)
+                          setNotice(`Loaded “${list.name}”.`)
+                        }}
+                        className="rounded-full bg-cream px-3 py-1 text-[12px] font-bold hover:bg-coral/10"
+                      >
+                        {list.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <input
+                    value={listName}
+                    onChange={(e) => setListName(e.target.value)}
+                    placeholder="List name"
+                    className="w-36 rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm outline-none ring-coral/40 focus:ring-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!teacherPack) {
+                        onRequestPaywall('studio')
+                        return
+                      }
+                      const parsed = parseNameList(classList)
+                      if (!parsed.length) {
+                        setNotice('Paste at least one student name.')
+                        return
+                      }
+                      const existing = savedLists.find((l) => l.name.toLowerCase() === listName.trim().toLowerCase())
+                      const saved = saveClassList({
+                        id: existing?.id ?? '',
+                        name: listName,
+                        names: parsed,
+                        updatedAt: Date.now(),
+                      })
+                      setSavedLists(listClassLists())
+                      setNotice(user ? `Class list “${saved.name}” saved to your account.` : `Class list “${saved.name}” saved in this browser.`)
+                    }}
+                    className="rounded-xl border-2 border-ink/15 px-3 py-2 text-sm font-bold"
+                  >
+                    Save class list
+                  </button>
+                  {savedLists.some((l) => l.name.toLowerCase() === listName.trim().toLowerCase()) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const existing = savedLists.find((l) => l.name.toLowerCase() === listName.trim().toLowerCase())
+                        if (!existing) return
+                        deleteClassList(existing.id)
+                        setSavedLists(listClassLists())
+                        setNotice(`Deleted “${existing.name}”.`)
+                      }}
+                      className="rounded-xl px-3 py-2 text-sm font-bold text-coral"
+                    >
+                      Delete list
+                    </button>
+                  ) : null}
+                </div>
               </label>
 
               <label className="mt-4 flex items-center gap-3">

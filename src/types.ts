@@ -232,3 +232,10 @@ export interface TeacherTemplate {
   sample: boolean
   updatedAt: number
 }
+
+export interface SavedClassList {
+  id: string
+  name: string
+  names: string[]
+  updatedAt: number
+}
