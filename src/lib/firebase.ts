@@ -3,12 +3,16 @@ import { GoogleAuthProvider, getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyB74MAFsL-pqpqD8IrjPfBSwbbJh19VkwI',
-  authDomain: 'worksheet-wizard-giri.firebaseapp.com',
-  projectId: 'worksheet-wizard-giri',
-  storageBucket: 'worksheet-wizard-giri.firebasestorage.app',
-  messagingSenderId: '323998203920',
-  appId: '1:323998203920:web:22fbede0812aa638388a95',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+}
+
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.appId) {
+  throw new Error('Missing Firebase env. Copy .env.example to .env.local and fill VITE_FIREBASE_* values.')
 }
 
 export const app = initializeApp(firebaseConfig)
