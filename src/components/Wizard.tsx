@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import type { Difficulty, PaywallReason, ThemeId, WorksheetType } from '../types'
-import { TOPICS, defaultTitle } from '../lib/catalog'
+import type { Difficulty, PaywallReason, SchoolClass, ThemeId, WorksheetType } from '../types'
+import { defaultSubject, defaultTitle, topicsFor } from '../lib/catalog'
 import { generateWorksheet } from '../lib/generators'
 import { downloadWorksheet } from '../lib/export'
 import {
@@ -9,7 +9,9 @@ import {
   incrementDailyDownloads,
   remainingFreeDownloads,
   saveForm,
+  type SavedForm,
 } from '../lib/storage'
+import { ageFromClass, typeAvailable } from '../lib/sheet'
 import { TypePicker } from './TypePicker'
 import { DetailsForm } from './DetailsForm'
 import { Preview } from './Preview'
@@ -17,84 +19,139 @@ import { Logo } from './Logo'
 
 interface Props {
   unlocked: boolean
+  teacherPack: boolean
   onRequestPaywall: (reason: PaywallReason) => void
   onHome: () => void
-  initialType?: WorksheetType
-  saved?: {
-    childName?: string
-    age?: number
-    difficulty?: Difficulty
-    type?: WorksheetType
-    topic?: string
-    title?: string
-    theme?: ThemeId
-  }
+  onStudio: () => void
+  saved?: Partial<SavedForm>
 }
 
-export function Wizard({ unlocked, onRequestPaywall, onHome, initialType, saved }: Props) {
+export function Wizard({ unlocked, teacherPack, onRequestPaywall, onHome, onStudio, saved }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [type, setType] = useState<WorksheetType>(initialType ?? saved?.type ?? 'maths')
+  const initialClass: SchoolClass = saved?.classLevel ?? 3
+  const [type, setType] = useState<WorksheetType>(() => {
+    const t = saved?.type
+    if (!t || t === 'custom') return 'maths'
+    if (!typeAvailable(t, initialClass)) return 'maths'
+    return t
+  })
+  const initialTopics = topicsFor(
+    saved?.type && saved.type !== 'custom' && typeAvailable(saved.type, initialClass) ? saved.type : 'maths',
+    initialClass,
+  )
   const [childName, setChildName] = useState(saved?.childName ?? 'Aarav')
-  const [age, setAge] = useState(saved?.age ?? 7)
+  const [classLevel, setClassLevel] = useState<SchoolClass>(initialClass)
+  const [section, setSection] = useState(saved?.section ?? '')
+  const [schoolName, setSchoolName] = useState(saved?.schoolName ?? '')
+  const [subject, setSubject] = useState(saved?.subject ?? '')
+  const [marks, setMarks] = useState(saved?.marks ?? '')
+  const [timeAllowed, setTimeAllowed] = useState(saved?.timeAllowed ?? '')
+  const [instructions, setInstructions] = useState(saved?.instructions ?? '')
+  const [includeAnswerKey, setIncludeAnswerKey] = useState(saved?.includeAnswerKey ?? true)
+  const [questionCount, setQuestionCount] = useState(saved?.questionCount ?? 0)
   const [difficulty, setDifficulty] = useState<Difficulty>(saved?.difficulty ?? 'easy')
-  const [topic, setTopic] = useState(saved?.topic ?? 'addition')
+  const [topic, setTopic] = useState(() =>
+    initialTopics.some((t) => t.value === saved?.topic) ? saved?.topic ?? initialTopics[0]!.value : initialTopics[0]!.value,
+  )
   const [title, setTitle] = useState(saved?.title ?? '')
   const [theme, setTheme] = useState<ThemeId>(saved?.theme ?? 'sunshine')
+  const [customWords, setCustomWords] = useState(saved?.customWords ?? '')
+  const [customPairs, setCustomPairs] = useState(saved?.customPairs ?? '')
   const [seed, setSeed] = useState(() => Date.now())
   const [busy, setBusy] = useState(false)
   const [remaining, setRemaining] = useState(() => remainingFreeDownloads())
 
-  const persist = (patch: {
-    childName?: string
-    age?: number
-    difficulty?: Difficulty
-    type?: WorksheetType
-    topic?: string
-    title?: string
-    theme?: ThemeId
-  }) => {
-    const next = {
+  const persist = (patch: Partial<SavedForm> = {}) => {
+    const next: SavedForm = {
       childName: patch.childName ?? childName,
-      age: patch.age ?? age,
+      age: ageFromClass(patch.classLevel ?? classLevel),
+      classLevel: patch.classLevel ?? classLevel,
+      section: patch.section ?? section,
+      schoolName: patch.schoolName ?? schoolName,
+      subject: patch.subject ?? subject,
+      marks: patch.marks ?? marks,
+      timeAllowed: patch.timeAllowed ?? timeAllowed,
+      instructions: patch.instructions ?? instructions,
+      includeAnswerKey: patch.includeAnswerKey ?? includeAnswerKey,
+      questionCount: patch.questionCount ?? questionCount,
       difficulty: patch.difficulty ?? difficulty,
       type: patch.type ?? type,
       topic: patch.topic ?? topic,
       title: patch.title ?? title,
       theme: patch.theme ?? theme,
+      customWords: patch.customWords ?? customWords,
+      customPairs: patch.customPairs ?? customPairs,
     }
     saveForm(next)
   }
 
+  const applyClass = (c: SchoolClass) => {
+    const nextTopics = topicsFor(type, c)
+    const nextTopic = nextTopics.some((t) => t.value === topic) ? topic : nextTopics[0]?.value ?? topic
+    const nextType = typeAvailable(type, c) ? type : 'maths'
+    setClassLevel(c)
+    setTopic(nextTopic)
+    if (nextType !== type) setType(nextType)
+    persist({ classLevel: c, topic: nextTopic, type: nextType })
+  }
+
   const onType = (t: WorksheetType) => {
-    const first = TOPICS[t][0]?.value ?? 'mixed'
+    const first = topicsFor(t, classLevel)[0]?.value ?? 'mixed'
     setType(t)
     setTopic(first)
-    persist({ type: t, topic: first })
+    if (!subject || subject === defaultSubject(type)) setSubject(defaultSubject(t))
+    persist({ type: t, topic: first, subject: defaultSubject(t) })
   }
 
-  const input = {
-    type,
-    childName,
-    age,
-    difficulty,
-    topic,
-    title: title.trim() || defaultTitle(childName, unlocked, type),
-    theme: unlocked ? theme : 'sunshine',
-    unlocked,
-    seed,
-  }
-
-  const model = useMemo(() => generateWorksheet(input), [
-    type,
-    childName,
-    age,
-    difficulty,
-    topic,
-    title,
-    theme,
-    unlocked,
-    seed,
-  ])
+  const model = useMemo(
+    () =>
+      generateWorksheet({
+        type,
+        childName,
+        age: ageFromClass(classLevel),
+        classLevel,
+        section,
+        schoolName,
+        subject,
+        marks,
+        timeAllowed,
+        instructions,
+        includeAnswerKey,
+        questionCount,
+        difficulty,
+        topic,
+        title: title.trim() || defaultTitle(childName, unlocked, type, classLevel),
+        theme: unlocked ? theme : 'sunshine',
+        unlocked,
+        teacherPack,
+        seed,
+        customWords,
+        customPairs,
+        customQuestions: '',
+      }),
+    [
+      type,
+      childName,
+      classLevel,
+      section,
+      schoolName,
+      subject,
+      marks,
+      timeAllowed,
+      instructions,
+      includeAnswerKey,
+      questionCount,
+      difficulty,
+      topic,
+      title,
+      theme,
+      unlocked,
+      teacherPack,
+      seed,
+      customWords,
+      customPairs,
+    ],
+  )
 
   const goPreview = () => {
     persist({})
@@ -137,26 +194,55 @@ export function Wizard({ unlocked, onRequestPaywall, onHome, initialType, saved 
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8">
-        {step === 1 ? <TypePicker value={type} onChange={onType} /> : null}
+        {step === 1 ? (
+          <TypePicker
+            value={type}
+            classLevel={classLevel}
+            onClassChange={applyClass}
+            onChange={onType}
+            onStudio={onStudio}
+          />
+        ) : null}
         {step === 2 ? (
           <DetailsForm
             type={type}
             childName={childName}
-            age={age}
+            classLevel={classLevel}
+            section={section}
+            schoolName={schoolName}
+            subject={subject}
+            marks={marks}
+            timeAllowed={timeAllowed}
+            instructions={instructions}
+            includeAnswerKey={includeAnswerKey}
+            questionCount={questionCount}
             difficulty={difficulty}
             topic={topic}
             title={title}
             theme={theme}
+            customWords={customWords}
+            customPairs={customPairs}
             unlocked={unlocked}
             onLockTheme={() => onRequestPaywall('theme')}
             onLockName={() => onRequestPaywall('name')}
+            onLockCustomise={() => onRequestPaywall('customise')}
             onChange={(patch) => {
               if (patch.childName !== undefined) setChildName(patch.childName)
-              if (patch.age !== undefined) setAge(patch.age)
+              if (patch.classLevel !== undefined) setClassLevel(patch.classLevel)
+              if (patch.section !== undefined) setSection(patch.section)
+              if (patch.schoolName !== undefined) setSchoolName(patch.schoolName)
+              if (patch.subject !== undefined) setSubject(patch.subject)
+              if (patch.marks !== undefined) setMarks(patch.marks)
+              if (patch.timeAllowed !== undefined) setTimeAllowed(patch.timeAllowed)
+              if (patch.instructions !== undefined) setInstructions(patch.instructions)
+              if (patch.includeAnswerKey !== undefined) setIncludeAnswerKey(patch.includeAnswerKey)
+              if (patch.questionCount !== undefined) setQuestionCount(patch.questionCount)
               if (patch.difficulty !== undefined) setDifficulty(patch.difficulty)
               if (patch.topic !== undefined) setTopic(patch.topic)
               if (patch.title !== undefined) setTitle(patch.title)
               if (patch.theme !== undefined) setTheme(patch.theme)
+              if (patch.customWords !== undefined) setCustomWords(patch.customWords)
+              if (patch.customPairs !== undefined) setCustomPairs(patch.customPairs)
               persist(patch)
             }}
           />
@@ -167,6 +253,7 @@ export function Wizard({ unlocked, onRequestPaywall, onHome, initialType, saved 
             busy={busy}
             remaining={remaining}
             unlocked={unlocked}
+            teacherPack={teacherPack}
             onDownload={() => void download()}
             onPrint={() => window.print()}
             onRegenerate={() => setSeed(Date.now())}

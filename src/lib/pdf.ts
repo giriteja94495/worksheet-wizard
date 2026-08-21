@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, degrees, type PDFPage, type PDFFont } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
-import type { PdfFonts, PdfOptions, ThemeId, WorksheetModel } from '../types'
+import type { PdfFonts, PdfOptions, ThemeId, WorksheetBase, WorksheetModel } from '../types'
+import { classLabel } from './sheet'
 import { THEME_TOKENS } from './themes'
 import { fileLabel, slugName } from './catalog'
 import nunitoRegularUrl from '../assets/fonts/Nunito-Regular.ttf?url'
@@ -45,10 +46,25 @@ export function addA4Page(doc: PDFDocument): PDFPage {
   return doc.addPage([A4.width, A4.height])
 }
 
+export interface PageCursor {
+  page: PDFPage
+  y: number
+  margin: number
+  contentBottom: number
+}
+
+function metaBits(model: WorksheetBase): string[] {
+  const bits: string[] = [classLabel(model.classLevel, model.section)]
+  if (model.subject) bits.push(model.subject)
+  if (model.marks) bits.push(`Max. ${model.marks}`)
+  if (model.timeAllowed) bits.push(`Time ${model.timeAllowed}`)
+  return bits
+}
+
 export function drawChrome(
   page: PDFPage,
   fonts: PdfFonts,
-  model: Pick<WorksheetModel, 'title' | 'madeFor' | 'theme' | 'unlocked'>,
+  model: WorksheetBase,
   options: PdfOptions,
 ): { contentTop: number; contentBottom: number; margin: number } {
   const { width, height } = A4
@@ -80,30 +96,86 @@ export function drawChrome(
     borderWidth: 0.8,
   })
 
+  let y = height - 46
+  if (model.schoolName) {
+    const school = model.schoolName.toUpperCase()
+    const sw = fonts.bold.widthOfTextAtSize(school, 10)
+    page.drawText(school, {
+      x: (width - sw) / 2,
+      y,
+      size: 10,
+      font: fonts.bold,
+      color: theme.pdfAccent,
+    })
+    y -= 16
+  }
+
   page.drawText(model.title, {
     x: margin,
-    y: height - 52,
-    size: 18,
+    y,
+    size: 16,
     font: fonts.display,
     color: INK,
   })
+  y -= 16
 
-  if (model.madeFor) {
-    page.drawText(model.madeFor, {
-      x: margin,
-      y: height - 70,
-      size: 10,
-      font: fonts.regular,
-      color: theme.pdfAccent,
-    })
+  const bits = metaBits(model)
+  page.drawText(bits.join('   ·   '), {
+    x: margin,
+    y,
+    size: 8,
+    font: fonts.regular,
+    color: MUTED,
+  })
+  y -= 14
+
+  const nameLabel = model.displayName && model.displayName !== 'My Worksheet' ? model.displayName : ''
+  page.drawText('Name', { x: margin, y, size: 8, font: fonts.regular, color: MUTED })
+  if (nameLabel) {
+    page.drawText(nameLabel, { x: margin + 32, y, size: 10, font: fonts.bold, color: INK })
   } else {
-    page.drawText('My Worksheet', {
-      x: margin,
-      y: height - 70,
-      size: 10,
-      font: fonts.regular,
+    page.drawLine({
+      start: { x: margin + 32, y: y - 1 },
+      end: { x: margin + 250, y: y - 1 },
+      thickness: 0.5,
       color: MUTED,
     })
+  }
+  page.drawText('Date', { x: 360, y, size: 8, font: fonts.regular, color: MUTED })
+  page.drawLine({
+    start: { x: 386, y: y - 1 },
+    end: { x: width - margin, y: y - 1 },
+    thickness: 0.5,
+    color: MUTED,
+  })
+  y -= 12
+
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: width - margin, y },
+    thickness: 0.4,
+    color: rgb(0.78, 0.8, 0.84),
+  })
+  y -= 12
+
+  if (model.instructions) {
+    page.drawText('Note', {
+      x: margin,
+      y,
+      size: 8,
+      font: fonts.bold,
+      color: MUTED,
+    })
+    y = drawWrapped(page, model.instructions, {
+      x: margin + 28,
+      y,
+      size: 8,
+      font: fonts.regular,
+      color: MUTED,
+      maxWidth: width - margin * 2 - 28,
+      lineHeight: 11,
+    })
+    y -= 4
   }
 
   const footer = 'Worksheet Wizard  ·  worksheetwizard.app'
@@ -128,7 +200,30 @@ export function drawChrome(
     })
   }
 
-  return { contentTop: height - 88, contentBottom: 52, margin }
+  return { contentTop: y, contentBottom: 52, margin }
+}
+
+export function startPage(
+  doc: import('pdf-lib').PDFDocument,
+  fonts: PdfFonts,
+  model: WorksheetBase,
+  options: PdfOptions,
+): PageCursor {
+  const page = addA4Page(doc)
+  const box = drawChrome(page, fonts, model, options)
+  return { page, y: box.contentTop, margin: box.margin, contentBottom: box.contentBottom }
+}
+
+export function ensureSpace(
+  cursor: PageCursor,
+  needed: number,
+  doc: import('pdf-lib').PDFDocument,
+  fonts: PdfFonts,
+  model: WorksheetBase,
+  options: PdfOptions,
+): PageCursor {
+  if (cursor.y - needed >= cursor.contentBottom) return cursor
+  return startPage(doc, fonts, model, options)
 }
 
 export function drawWrapped(
@@ -182,8 +277,10 @@ export async function downloadPdf(doc: PDFDocument, filename: string): Promise<v
   URL.revokeObjectURL(url)
 }
 
-export function pdfFileName(model: WorksheetModel): string {
-  return `${slugName(model.displayName === 'My Worksheet' ? '' : model.displayName, true)}-${fileLabel(model.kind)}.pdf`
+export function pdfFileName(model: WorksheetModel, suffix = ''): string {
+  const who = slugName(model.displayName === 'My Worksheet' ? '' : model.displayName, true)
+  const extra = suffix ? `-${suffix}` : ''
+  return `${who}-Class${model.classLevel}-${fileLabel(model.kind)}${extra}.pdf`
 }
 
 export function themeOf(id: ThemeId) {

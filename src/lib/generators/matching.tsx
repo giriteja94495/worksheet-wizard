@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { MatchingModel, MatchPair, PdfFonts, PdfOptions, PictogramId, WizardInput } from '../../types'
 import { mulberry32, shuffle, randInt } from '../rng'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { PICTOGRAMS, opsToSvg, drawOpsOnPage } from '../pictograms'
 import { addA4Page, drawChrome, ink, muted } from '../pdf'
+import { baseFields, effectiveCount, parsePairLines } from '../sheet'
 
 const PICTURE_SET: { icon: PictogramId; word: string }[] = [
   { icon: 'cat', word: 'cat' },
@@ -40,16 +40,35 @@ function dots(n: number): string {
   return '● '.repeat(n).trim()
 }
 
+const TERMS: [string, string][] = [
+  ['noun', 'naming word'],
+  ['verb', 'doing word'],
+  ['photosynthesis', 'plants make food'],
+  ['New Delhi', 'capital of India'],
+  ['H2O', 'water'],
+  ['numerator', 'top of a fraction'],
+  ['perimeter', 'distance around a shape'],
+  ['evaporation', 'liquid to vapour'],
+  ['parallel', 'never meet'],
+  ['mean', 'average'],
+  ['equation', 'statement of equality'],
+  ['friction', 'opposes motion'],
+]
+
 export function generate(input: WizardInput): MatchingModel {
   const rng = mulberry32(input.seed)
+  const custom = input.unlocked ? parsePairLines(input.customPairs) : []
   const topic = input.topic || 'pictures'
-  const count = input.difficulty === 'hard' ? 8 : input.difficulty === 'easy' ? 6 : 7
+  const count = effectiveCount(input, input.difficulty === 'hard' ? 8 : input.difficulty === 'easy' ? 6 : 7)
   let pairs: MatchPair[] = []
 
-  if (topic === 'numbers') {
+  if (custom.length >= 3) {
+    pairs = custom.slice(0, count).map((p) => ({ left: p.left, right: p.right, icon: 'star' as PictogramId }))
+  } else if (topic === 'numbers') {
     const used = new Set<number>()
+    const max = input.classLevel <= 2 ? 6 : 10
     while (pairs.length < count) {
-      const n = randInt(rng, 1, input.age <= 6 ? 6 : 10)
+      const n = randInt(rng, 1, max)
       if (used.has(n)) continue
       used.add(n)
       pairs.push({ left: dots(n), right: String(n), icon: 'ball' })
@@ -58,6 +77,10 @@ export function generate(input: WizardInput): MatchingModel {
     pairs = shuffle(rng, RHYMES)
       .slice(0, count)
       .map(([a, b]) => ({ left: a, right: b, icon: 'heart' as PictogramId }))
+  } else if (topic === 'terms') {
+    pairs = shuffle(rng, TERMS)
+      .slice(0, count)
+      .map(([a, b]) => ({ left: a, right: b, icon: 'star' as PictogramId }))
   } else {
     pairs = shuffle(rng, PICTURE_SET)
       .slice(0, count)
@@ -70,16 +93,8 @@ export function generate(input: WizardInput): MatchingModel {
   )
 
   return {
-    kind: 'matching',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'matching'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic,
+    ...baseFields(input, 'matching'),
+    topic: custom.length >= 3 ? 'custom' : topic,
     pairs,
     shuffledRight,
   }

@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { PdfFonts, PdfOptions, SpellingModel, WizardInput } from '../../types'
 import { mulberry32, randInt, shuffle } from '../rng'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { isWordTheme, themedWords } from '../words'
 import { addA4Page, drawChrome, ink, muted } from '../pdf'
+import { baseFields, effectiveCount, parseWordList } from '../sheet'
 
 function maskWord(word: string, rng: () => number): string {
   if (word.length <= 3) {
@@ -35,20 +35,16 @@ function scramble(word: string, rng: () => number): string {
 
 export function generate(input: WizardInput): SpellingModel {
   const rng = mulberry32(input.seed)
+  const custom = input.unlocked ? parseWordList(input.customWords) : []
   const theme = isWordTheme(input.topic) ? input.topic : 'animals'
-  const count = input.difficulty === 'hard' ? 10 : input.difficulty === 'medium' ? 8 : 6
-  const words = themedWords(rng, theme, input.age, input.difficulty, count)
+  const count = effectiveCount(input, input.difficulty === 'hard' ? 10 : input.difficulty === 'medium' ? 8 : 6)
+  const words =
+    custom.length >= 3
+      ? custom.slice(0, count)
+      : themedWords(rng, theme, input.age, input.difficulty, count)
   return {
-    kind: 'spelling',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'spelling'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic: theme,
+    ...baseFields(input, 'spelling'),
+    topic: custom.length >= 3 ? 'custom' : theme,
     words,
     missing: words.map((w) => ({ word: w, masked: maskWord(w, rng) })),
     scrambles: words.map((w) => ({ word: w, scrambled: scramble(w, rng) })),

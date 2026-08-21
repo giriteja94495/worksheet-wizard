@@ -1,4 +1,4 @@
-import type { PaywallReason } from '../types'
+import type { PaywallReason, UnlockTier } from '../types'
 
 const COPY: Record<PaywallReason, { kicker: string; title: string; body: string }> = {
   download: {
@@ -14,23 +14,36 @@ const COPY: Record<PaywallReason, { kicker: string; title: string; body: string 
   name: {
     kicker: 'Personalisation',
     title: 'Print their actual name on every sheet',
-    body: 'Free sheets say “My Worksheet”. Lifetime prints “Made for Kabir” in the header — the detail kids notice.',
+    body: 'Free sheets leave the name line blank. Lifetime prints “Isha” or “Kabir” in the header — the detail students notice.',
   },
   preview: {
     kicker: 'Worksheet Wizard Lifetime',
     title: 'Keep making sheets, skip the limits',
-    body: 'Unlimited PDFs, every theme, name on the page, no watermark. One payment, kept in this browser.',
+    body: 'Unlimited PDFs, every theme, name on the page, school header, no watermark. One payment, kept in this browser.',
+  },
+  customise: {
+    kicker: 'Full customisation',
+    title: 'School header, marks, notes and question count',
+    body: 'Lifetime unlocks the A4 chrome teachers actually use: school name, class-section, subject, marks, time, and a note to students.',
+  },
+  studio: {
+    kicker: 'Teacher Pack',
+    title: 'Save your library and print a class set',
+    body: 'Teacher Studio can already preview your questions. The ₹149 pack keeps templates in this browser and downloads one named PDF copy per student.',
   },
 }
 
 interface Props {
   reason: PaywallReason
+  unlocked: boolean
+  teacherPack: boolean
   onClose: () => void
-  onUnlock: () => void
+  onUnlock: (tier: UnlockTier) => void
 }
 
-export function Paywall({ reason, onClose, onUnlock }: Props) {
+export function Paywall({ reason, unlocked, teacherPack, onClose, onUnlock }: Props) {
   const copy = COPY[reason]
+  const showTeacherFirst = reason === 'studio'
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 p-3 sm:items-center" role="dialog" aria-modal>
       <button className="absolute inset-0 cursor-default" aria-label="Close paywall" onClick={onClose} />
@@ -41,43 +54,71 @@ export function Paywall({ reason, onClose, onUnlock }: Props) {
         </div>
         <div className="px-5 py-5">
           <p className="text-sm leading-relaxed text-ink-soft">{copy.body}</p>
-          <div className="mt-4 rounded-2xl border border-ink/10 bg-cream/80 p-4">
-            <div className="flex items-baseline justify-between">
-              <span className="font-display text-lg">Lifetime</span>
-              <span className="font-display text-3xl tracking-tight">
-                ₹49 <span className="text-base text-ink/45">one time</span>
-              </span>
+
+          {!showTeacherFirst && !unlocked ? (
+            <div className="mt-4 rounded-2xl border border-ink/10 bg-cream/80 p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-lg">Lifetime</span>
+                <span className="font-display text-3xl tracking-tight">
+                  ₹49 <span className="text-base text-ink/45">one time</span>
+                </span>
+              </div>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {['Unlimited PDF downloads', 'Name + school header', 'Ocean, Jungle & Space themes', 'No “Free” watermark'].map(
+                  (item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="text-teal">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ),
+                )}
+              </ul>
+              <button
+                type="button"
+                onClick={() => onUnlock('lifetime')}
+                className="mt-4 w-full rounded-xl bg-[#0D6E4F] py-3.5 text-[15px] font-extrabold text-white shadow-[0_8px_0_#0A543C] transition hover:translate-y-px"
+              >
+                Unlock lifetime for ₹49 — demo
+              </button>
             </div>
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {[
-                'Unlimited PDF downloads',
-                'Name on every worksheet',
-                'Ocean, Jungle & Space themes',
-                'No “Free” watermark',
-              ].map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="text-teal">✓</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <button
-            type="button"
-            onClick={onUnlock}
-            className="mt-4 w-full rounded-xl bg-[#0D6E4F] py-3.5 text-[15px] font-extrabold text-white shadow-[0_8px_0_#0A543C] transition hover:translate-y-px hover:shadow-[0_7px_0_#0A543C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-          >
-            Unlock lifetime for ₹49 — demo
-          </button>
+          ) : null}
+
+          {!teacherPack ? (
+            <div className={`mt-3 rounded-2xl border p-4 ${showTeacherFirst ? 'border-coral bg-coral/5' : 'border-ink/10'}`}>
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-lg">Teacher Pack</span>
+                <span className="font-display text-3xl tracking-tight">
+                  ₹149 <span className="text-base text-ink/45">one time</span>
+                </span>
+              </div>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {['Everything in Lifetime', 'Save / load Teacher Studio templates', 'Class list of up to 30 names', 'Named multi-page class PDF'].map(
+                  (item) => (
+                    <li key={item} className="flex gap-2">
+                      <span className="text-teal">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ),
+                )}
+              </ul>
+              <button
+                type="button"
+                onClick={() => onUnlock('teacher')}
+                className="mt-4 w-full rounded-xl bg-ink py-3.5 text-[15px] font-extrabold text-cream shadow-[0_8px_0_#12182A] transition hover:translate-y-px"
+              >
+                Unlock Teacher Pack for ₹149 — demo
+              </button>
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl bg-teal/10 px-3 py-2 text-center text-sm font-bold text-teal-dark">
+              Teacher Pack is already on this device.
+            </p>
+          )}
+
           <p className="mt-3 text-center text-[11px] text-ink/45">
             UPI · Cards · Netbanking · Wallet · Prototype checkout (no charge)
           </p>
-          <p className="mt-1 text-center text-[11px] text-ink/35">Inclusive of taxes · Powered by a Razorpay-style flow</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-3 w-full py-2 text-sm font-semibold text-ink/55 hover:text-ink"
-          >
+          <button type="button" onClick={onClose} className="mt-3 w-full py-2 text-sm font-semibold text-ink/55 hover:text-ink">
             Not now
           </button>
         </div>

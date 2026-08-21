@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { ColouringModel, DrawOp, PdfFonts, PdfOptions, ThemeId, WizardInput } from '../../types'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { opsToSvg } from '../pictograms'
 import { addA4Page, drawChrome, ink, muted, rgb } from '../pdf'
+import { baseFields } from '../sheet'
 
 function scene(theme: ThemeId): { ops: DrawOp[]; caption: string } {
   if (theme === 'ocean') {
@@ -112,16 +112,7 @@ function scene(theme: ThemeId): { ops: DrawOp[]; caption: string } {
 export function generate(input: WizardInput): ColouringModel {
   const { ops, caption } = scene(input.theme)
   return {
-    kind: 'colouring',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'colouring'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic: input.topic,
+    ...baseFields(input, 'colouring'),
     ops,
     caption,
   }

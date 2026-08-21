@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { OddOneOutModel, OddRow, PdfFonts, PdfOptions, WizardInput } from '../../types'
 import { mulberry32, pick, randInt, shuffle } from '../rng'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { addA4Page, drawChrome, ink, muted } from '../pdf'
+import { baseFields, classBand } from '../sheet'
 
 interface Bank {
   hint: string
@@ -20,8 +20,16 @@ const BANKS: Bank[] = [
   { hint: 'nature', groups: [['tree', 'leaf', 'flower'], ['rain', 'cloud', 'sun']], odd: ['chair', 'truck', 'socks'] },
 ]
 
-function makeRow(rng: () => number): OddRow {
-  const bank = pick(rng, BANKS)
+const ACADEMIC: Bank[] = [
+  { hint: 'maths', groups: [['square', 'rectangle', 'rhombus'], ['add', 'subtract', 'multiply']], odd: ['noun', 'leaf', 'river'] },
+  { hint: 'science', groups: [['root', 'stem', 'leaf'], ['solid', 'liquid', 'gas']], odd: ['poem', 'pencil', 'festival'] },
+  { hint: 'english', groups: [['run', 'jump', 'swim'], ['he', 'she', 'they']], odd: ['seven', 'yellow', 'Delhi'] },
+  { hint: 'civics', groups: [['Lok Sabha', 'Rajya Sabha', 'Parliament'], ['right', 'duty', 'constitution']], odd: ['photosynthesis', 'triangle', 'mango'] },
+]
+
+function makeRow(rng: () => number, classLevel: number): OddRow {
+  const pool = classLevel >= 6 ? [...BANKS, ...ACADEMIC] : BANKS
+  const bank = pick(rng, pool)
   const base = pick(rng, bank.groups)
   const odd = pick(rng, bank.odd)
   const items = shuffle(rng, [...base, odd])
@@ -31,27 +39,19 @@ function makeRow(rng: () => number): OddRow {
 export function generate(input: WizardInput): OddOneOutModel {
   const rng = mulberry32(input.seed)
   const rows: OddRow[] = []
-  for (let i = 0; i < 6; i++) {
+  const n = classBand(input.classLevel) === 'early' ? 5 : 6
+  for (let i = 0; i < n; i++) {
     if (i === 2) {
-      const n = randInt(rng, 2, 9)
-      const items = shuffle(rng, [String(n), String(n), String(n), String(n + 3)])
-      const oddVal = String(n + 3)
+      const k = randInt(rng, 2, 9)
+      const items = shuffle(rng, [String(k), String(k), String(k), String(k + 3)])
+      const oddVal = String(k + 3)
       rows.push({ items, oddIndex: items.indexOf(oddVal), hint: 'numbers' })
     } else {
-      rows.push(makeRow(rng))
+      rows.push(makeRow(rng, input.classLevel))
     }
   }
   return {
-    kind: 'oddoneout',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'oddoneout'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic: input.topic,
+    ...baseFields(input, 'oddoneout'),
     rows,
   }
 }

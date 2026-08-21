@@ -1,12 +1,23 @@
 import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { HandwritingLine, HandwritingModel, HandwritingMode, PdfFonts, PdfOptions, WizardInput } from '../../types'
+import { baseFields } from '../sheet'
 import { mulberry32 } from '../rng'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { sightWords } from '../words'
 import { addA4Page, drawChrome, ink, muted, rgb } from '../pdf'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+const SENTENCES = [
+  'The sun is bright today.',
+  'I like to read books.',
+  'Please wait for your turn.',
+  'India is my country.',
+  'We play in the garden.',
+  'Honesty is the best policy.',
+  'Knowledge is power.',
+  'Hard work brings success.',
+]
 
 export function generate(input: WizardInput): HandwritingModel {
   const rng = mulberry32(input.seed)
@@ -14,13 +25,14 @@ export function generate(input: WizardInput): HandwritingModel {
   const rawName = input.unlocked ? input.childName.trim() : ''
   const name = rawName || 'Name'
   const lines: HandwritingLine[] = []
+  const cls = input.classLevel
 
   if (mode === 'name') {
     lines.push({ prompt: 'Trace your name', trace: name, copies: 6 })
     lines.push({ prompt: 'Now write it yourself', trace: '', copies: 2 })
   } else if (mode === 'alphabet') {
     const slice =
-      input.difficulty === 'easy' || input.age <= 6
+      input.difficulty === 'easy' || cls <= 2
         ? LETTERS.slice(0, 13)
         : input.difficulty === 'hard'
           ? LETTERS
@@ -28,24 +40,19 @@ export function generate(input: WizardInput): HandwritingModel {
     slice.forEach((L) => {
       lines.push({ prompt: '', trace: `${L}${L.toLowerCase()}`, copies: 1 })
     })
+  } else if (mode === 'sentences') {
+    SENTENCES.slice(0, cls >= 8 ? 6 : 5).forEach((s) => {
+      lines.push({ prompt: s, trace: s, copies: 1 })
+    })
   } else {
-    const words = sightWords(rng, input.age, input.difficulty, input.age <= 6 ? 6 : 8)
+    const words = sightWords(rng, input.age || cls + 5, input.difficulty, cls <= 2 ? 6 : 8)
     words.forEach((w) => {
       lines.push({ prompt: w, trace: w, copies: 1 })
     })
   }
 
   return {
-    kind: 'handwriting',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'handwriting'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic: mode,
+    ...baseFields(input, 'handwriting'),
     mode,
     lines,
   }
@@ -81,7 +88,9 @@ export function renderPreview(model: HandwritingModel): ReactNode {
           ? 'Trace, then write on the lines'
           : model.mode === 'alphabet'
             ? 'Start at the dot. Trace each letter.'
-            : 'Trace each sight word, then write it again.'}
+            : model.mode === 'sentences'
+              ? 'Trace each sentence, then write it again.'
+              : 'Trace each sight word, then write it again.'}
       </p>
       {alphabet ? (
         <div className="grid grid-cols-2 gap-x-3">
@@ -120,7 +129,9 @@ export async function renderPdf(
       ? 'Trace the grey letters, then write on the empty lines.'
       : model.mode === 'alphabet'
         ? 'Trace each letter. Start at the top.'
-        : 'Trace each word, then write it on the line below.',
+        : model.mode === 'sentences'
+          ? 'Trace each sentence, then write it on the line below.'
+          : 'Trace each word, then write it on the line below.',
     { x: margin, y, size: 9, font: fonts.regular, color: muted() },
   )
   y -= 22

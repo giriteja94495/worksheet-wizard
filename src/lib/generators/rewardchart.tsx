@@ -1,24 +1,15 @@
 import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { PdfFonts, PdfOptions, RewardChartModel, WizardInput } from '../../types'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { addA4Page, drawChrome, ink, muted, rgb } from '../pdf'
+import { baseFields } from '../sheet'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const HABITS = ['Homework', 'Reading', 'Kindness', 'Tidy up', 'Sleep on time']
 
 export function generate(input: WizardInput): RewardChartModel {
   return {
-    kind: 'rewardchart',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'rewardchart'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic: input.topic,
+    ...baseFields(input, 'rewardchart'),
     habits: [...HABITS],
     days: [...DAYS],
   }

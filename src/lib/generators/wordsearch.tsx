@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { PdfFonts, PdfOptions, WizardInput, WordSearchModel } from '../../types'
 import { mulberry32, pick, randInt } from '../rng'
-import { displayName, madeForLine, defaultTitle } from '../catalog'
 import { isWordTheme, themedWords } from '../words'
 import { addA4Page, drawChrome, ink, muted } from '../pdf'
+import { baseFields, effectiveCount, parseWordList } from '../sheet'
 
 type Dir = { dx: number; dy: number }
 
@@ -57,28 +57,28 @@ function placeWords(size: number, words: string[], dirs: Dir[], rng: () => numbe
 
 export function generate(input: WizardInput): WordSearchModel {
   const rng = mulberry32(input.seed)
+  const custom = input.unlocked
+    ? parseWordList(input.customWords)
+        .map((w) => w.toUpperCase().replace(/[^A-Z]/g, ''))
+        .filter((w) => w.length >= 3)
+    : []
   const theme = isWordTheme(input.topic) ? input.topic : 'animals'
   const size = input.difficulty === 'hard' ? 12 : input.difficulty === 'medium' ? 10 : 8
-  const count = input.difficulty === 'hard' ? 12 : input.difficulty === 'medium' ? 10 : 8
-  const words = themedWords(rng, theme, input.age, input.difficulty, count)
-    .map((w) => w.toUpperCase().replace(/[^A-Z]/g, ''))
-    .filter((w) => w.length >= 3 && w.length <= size)
-  const dirs = input.difficulty === 'hard' ? HVD : HV
-  const grid = placeWords(size, words, dirs, rng)
+  const count = effectiveCount(input, input.difficulty === 'hard' ? 12 : input.difficulty === 'medium' ? 10 : 8)
+  const picked =
+    custom.length >= 4
+      ? custom.filter((w) => w.length <= size).slice(0, count)
+      : themedWords(rng, theme, input.age, input.difficulty, count)
+          .map((w) => w.toUpperCase().replace(/[^A-Z]/g, ''))
+          .filter((w) => w.length >= 3 && w.length <= size)
+  const dirs = input.difficulty === 'hard' || input.classLevel >= 6 ? HVD : HV
+  const grid = placeWords(size, picked, dirs, rng)
   return {
-    kind: 'wordsearch',
-    seed: input.seed,
-    title: input.title.trim() || defaultTitle(input.childName, input.unlocked, 'wordsearch'),
-    displayName: displayName(input.childName, input.unlocked),
-    madeFor: madeForLine(input.childName, input.unlocked),
-    theme: input.theme,
-    unlocked: input.unlocked,
-    age: input.age,
-    difficulty: input.difficulty,
-    topic: theme,
+    ...baseFields(input, 'wordsearch'),
+    topic: custom.length >= 4 ? 'custom' : theme,
     size,
     grid,
-    words,
+    words: picked,
   }
 }
 

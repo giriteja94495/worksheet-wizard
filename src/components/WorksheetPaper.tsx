@@ -1,17 +1,38 @@
 import type { ReactNode } from 'react'
-import type { ThemeId } from '../types'
+import type { WorksheetBase } from '../types'
 import { THEME_TOKENS } from '../lib/themes'
+import { classLabel } from '../lib/sheet'
 
 interface Props {
-  title: string
-  madeFor: string | null
-  theme: ThemeId
+  model: Pick<
+    WorksheetBase,
+    | 'title'
+    | 'madeFor'
+    | 'theme'
+    | 'schoolName'
+    | 'classLevel'
+    | 'section'
+    | 'subject'
+    | 'marks'
+    | 'timeAllowed'
+    | 'instructions'
+    | 'displayName'
+    | 'unlocked'
+  >
   watermark?: boolean
   children: ReactNode
 }
 
-export function WorksheetPaper({ title, madeFor, theme, watermark, children }: Props) {
-  const t = THEME_TOKENS[theme]
+export function WorksheetPaper({ model, watermark, children }: Props) {
+  const t = THEME_TOKENS[model.theme]
+  const named = model.displayName && model.displayName !== 'My Worksheet' ? model.displayName : ''
+  const bits = [
+    classLabel(model.classLevel, model.section),
+    model.subject,
+    model.marks ? `Max. ${model.marks}` : '',
+    model.timeAllowed ? `Time ${model.timeAllowed}` : '',
+  ].filter(Boolean)
+
   return (
     <article
       className="print-sheet relative mx-auto aspect-[1/1.414] w-full overflow-hidden bg-paper text-ink"
@@ -27,16 +48,37 @@ export function WorksheetPaper({ title, madeFor, theme, watermark, children }: P
           backgroundSize: '14px 14px',
         }}
       />
-      <div className="relative flex h-full flex-col px-[6%] py-[5%]">
-        <header className="mb-3 border-b pb-2" style={{ borderColor: `${t.border}99` }}>
-          <h2 className="font-display text-[clamp(14px,2.4vw,22px)] leading-tight">{title}</h2>
-          <p className="mt-0.5 text-[clamp(9px,1.4vw,12px)] font-semibold" style={{ color: t.accent }}>
-            {madeFor ?? 'My Worksheet'}
-          </p>
+      <div className="relative flex h-full flex-col px-[6%] py-[4.5%]">
+        <header className="mb-2 border-b pb-2" style={{ borderColor: `${t.border}99` }}>
+          {model.schoolName ? (
+            <p
+              className="text-center text-[clamp(8px,1.3vw,11px)] font-extrabold uppercase tracking-[0.14em]"
+              style={{ color: t.accent }}
+            >
+              {model.schoolName}
+            </p>
+          ) : null}
+          <h2 className="font-display text-[clamp(13px,2.2vw,20px)] leading-tight">{model.title}</h2>
+          <p className="mt-0.5 text-[clamp(8px,1.25vw,11px)] text-ink/55">{bits.join(' · ')}</p>
+          <div className="mt-1.5 flex gap-3 text-[clamp(8px,1.2vw,10px)]">
+            <div className="flex min-w-0 flex-1 items-end gap-1 border-b border-ink/20 pb-0.5">
+              <span className="text-ink/45">Name</span>
+              <span className="truncate font-bold">{named}</span>
+            </div>
+            <div className="flex w-[32%] items-end gap-1 border-b border-ink/20 pb-0.5">
+              <span className="text-ink/45">Date</span>
+            </div>
+          </div>
+          {model.instructions ? (
+            <p className="mt-1.5 line-clamp-2 text-[clamp(8px,1.15vw,10px)] text-ink/55">
+              <span className="font-bold text-ink/70">Note. </span>
+              {model.instructions}
+            </p>
+          ) : null}
         </header>
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         <footer
-          className="mt-3 border-t pt-2 text-center text-[clamp(8px,1.2vw,10px)] text-ink/45"
+          className="mt-2 border-t pt-1.5 text-center text-[clamp(8px,1.2vw,10px)] text-ink/45"
           style={{ borderColor: `${t.border}66` }}
         >
           Worksheet Wizard · worksheetwizard.app

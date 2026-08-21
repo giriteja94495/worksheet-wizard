@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { PDFDocument } from 'pdf-lib'
 import type { PdfFonts, PdfOptions, WizardInput, WorksheetModel, WorksheetType } from '../../types'
+import { applyInputDefaults, typeAvailable } from '../sheet'
 import * as maths from './maths'
 import * as handwriting from './handwriting'
 import * as spelling from './spelling'
@@ -9,6 +10,7 @@ import * as matching from './matching'
 import * as oddoneout from './oddoneout'
 import * as colouring from './colouring'
 import * as rewardchart from './rewardchart'
+import { quiz, grammar, science, custom } from './academic'
 
 interface Generator {
   generate: (input: WizardInput) => WorksheetModel
@@ -42,10 +44,16 @@ const REGISTRY: Record<WorksheetType, Generator> = {
   oddoneout: wrap(oddoneout),
   colouring: wrap(colouring),
   rewardchart: wrap(rewardchart),
+  quiz: wrap(quiz),
+  grammar: wrap(grammar),
+  science: wrap(science),
+  custom: wrap(custom),
 }
 
 export function generateWorksheet(input: WizardInput): WorksheetModel {
-  return REGISTRY[input.type].generate(input)
+  const full = applyInputDefaults(input)
+  const type = typeAvailable(full.type, full.classLevel) ? full.type : 'maths'
+  return REGISTRY[type].generate({ ...full, type })
 }
 
 export function renderPreview(model: WorksheetModel): ReactNode {
