@@ -8,7 +8,7 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth'
-import { auth, googleProvider } from './firebase'
+import { auth, firebaseConfigured, googleProvider } from './firebase'
 import { attachCloudSession, detachCloudSession } from './session'
 import type { CloudProfile } from './cloud'
 import { isTeacherPack, isUnlocked } from './storage'
@@ -19,6 +19,7 @@ interface AuthContextValue {
   ready: boolean
   syncing: boolean
   dataEpoch: number
+  cloudAvailable: boolean
   authOpen: boolean
   openAuth: () => void
   closeAuth: () => void
@@ -33,12 +34,13 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<CloudProfile | null>(null)
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(() => !auth)
   const [syncing, setSyncing] = useState(false)
   const [dataEpoch, setDataEpoch] = useState(0)
   const [authOpen, setAuthOpen] = useState(false)
 
   useEffect(() => {
+    if (!auth) return
     let generation = 0
     const unsub = onAuthStateChanged(auth, (next) => {
       const my = ++generation
@@ -89,12 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
+    if (!auth) throw Object.assign(new Error('Cloud sign-in isn’t configured.'), { code: 'auth/configuration-not-found' })
     await signInWithPopup(auth, googleProvider)
     afterSignIn()
   }, [afterSignIn])
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
+      if (!auth) throw Object.assign(new Error('Cloud sign-in isn’t configured.'), { code: 'auth/configuration-not-found' })
       await signInWithEmailAndPassword(auth, email.trim(), password)
       afterSignIn()
     },
@@ -103,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createAccount = useCallback(
     async (email: string, password: string, displayName: string) => {
+      if (!auth) throw Object.assign(new Error('Cloud sign-in isn’t configured.'), { code: 'auth/configuration-not-found' })
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
       const name = displayName.trim()
       if (name) await updateProfile(cred.user, { displayName: name })
@@ -112,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signOutUser = useCallback(async () => {
+    if (!auth) return
     await signOut(auth)
   }, [])
 
@@ -122,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       syncing,
       dataEpoch,
+      cloudAvailable: firebaseConfigured,
       authOpen,
       openAuth,
       closeAuth,

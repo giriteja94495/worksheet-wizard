@@ -6,6 +6,7 @@ import {
   getDocs,
   serverTimestamp,
   setDoc,
+  type Firestore,
 } from 'firebase/firestore'
 import type { User } from 'firebase/auth'
 import type { SavedClassList, TeacherTemplate, ThemeId } from '../types'
@@ -19,16 +20,21 @@ export interface CloudProfile {
   teacherPack: boolean
 }
 
+function firestore(): Firestore {
+  if (!db) throw new Error('Firebase is not configured')
+  return db
+}
+
 function userDoc(uid: string) {
-  return doc(db, 'users', uid)
+  return doc(firestore(), 'users', uid)
 }
 
 function templateDoc(uid: string, id: string) {
-  return doc(db, 'users', uid, 'templates', id)
+  return doc(firestore(), 'users', uid, 'templates', id)
 }
 
 function classListDoc(uid: string, id: string) {
-  return doc(db, 'users', uid, 'classLists', id)
+  return doc(firestore(), 'users', uid, 'classLists', id)
 }
 
 function asString(value: unknown, fallback = ''): string {
@@ -144,7 +150,7 @@ export function cloudToTemplate(id: string, data: Record<string, unknown>): Teac
 }
 
 export async function listCloudTemplates(uid: string): Promise<TeacherTemplate[]> {
-  const snap = await getDocs(collection(db, 'users', uid, 'templates'))
+  const snap = await getDocs(collection(firestore(), 'users', uid, 'templates'))
   return snap.docs
     .map((d) => cloudToTemplate(d.id, d.data() as Record<string, unknown>))
     .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -196,7 +202,7 @@ export function cloudToClassList(id: string, data: Record<string, unknown>): Sav
 }
 
 export async function listCloudClassLists(uid: string): Promise<SavedClassList[]> {
-  const snap = await getDocs(collection(db, 'users', uid, 'classLists'))
+  const snap = await getDocs(collection(firestore(), 'users', uid, 'classLists'))
   return snap.docs
     .map((d) => cloudToClassList(d.id, d.data() as Record<string, unknown>))
     .sort((a, b) => b.updatedAt - a.updatedAt)

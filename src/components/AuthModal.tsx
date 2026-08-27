@@ -4,7 +4,7 @@ import { explainAuthError } from '../lib/auth-errors'
 import { Logo } from './Logo'
 
 export function AuthModal() {
-  const { authOpen, closeAuth, signInWithGoogle, signInWithEmail, createAccount } = useAuth()
+  const { authOpen, closeAuth, cloudAvailable, signInWithGoogle, signInWithEmail, createAccount } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -55,13 +55,21 @@ export function AuthModal() {
             {mode === 'signin' ? 'Sign in to Worksheet Wizard' : 'Create your teacher account'}
           </h2>
           <p className="mt-2 text-sm text-cream/75">
-            Guests still work in this browser. An account keeps templates, class lists and demo unlocks with you.
+            {cloudAvailable
+              ? 'Guests still work in this browser. An account keeps templates, class lists and demo unlocks with you.'
+              : 'This public build is guest-only. Worksheets still generate and print in this browser.'}
           </p>
         </div>
         <div className="px-5 py-5">
           <div className="mb-4 flex justify-center">
             <Logo compact />
           </div>
+          {!cloudAvailable ? (
+            <button type="button" onClick={closeAuth} className="w-full rounded-xl bg-coral py-3.5 text-[15px] font-extrabold text-white shadow-[0_8px_0_#C45344]">
+              Continue as guest
+            </button>
+          ) : (
+            <>
           <button
             type="button"
             onClick={() => void onGoogle()}
@@ -142,6 +150,8 @@ export function AuthModal() {
           <button type="button" onClick={closeAuth} className="mt-2 w-full py-2 text-sm font-semibold text-ink/55 hover:text-ink">
             Continue as guest
           </button>
+            </>
+          )}
         </div>
       </div>
     </div>

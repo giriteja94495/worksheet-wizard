@@ -7,6 +7,8 @@ function errorCode(err: unknown): string {
 
 export function explainAuthError(err: unknown): string {
   switch (errorCode(err)) {
+    case 'auth/configuration-not-found':
+      return 'Cloud sign-in isn’t available in this build. Guest worksheets still work in this browser.'
     case 'auth/unauthorized-domain':
       return 'Google sign-in isn’t allowed on this website yet. Firebase still needs giriteja94495.github.io added as an authorised domain. Email and password should still work, or try Google again after that domain is added.'
     case 'auth/operation-not-allowed':
